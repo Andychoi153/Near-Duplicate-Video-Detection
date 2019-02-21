@@ -12,17 +12,49 @@ import math
 from .model import features_alex_net, alex_net
 
 
-def get_file_dict(file_path):
-    pass
+class FileHandler:
+
+    def get_file_dict(self, file_path):
+        file_names = os.listdir(file_path)
+        vids = []
+        key_frames = []
+
+        for i in file_names:
+            vid = i.split('_')[0]
+            vids.append(vid)
+
+        vids = list(set(vids))
+        vid_dict = {k: key_frames for k in vids}
+
+        for file_name in file_names:
+            vid = file_name.split('_')[0]
+            temp = vid_dict.get(vid)
+            temp.append(file_name)
+            vid_dict.update({vid: temp})
+        return vid_dict
 
 
-def get_video_frames(vid):
-    pass
+def get_video_frames(vid, vid_dict):
+    images = []
+    key_frames = vid_dict.get(vid)
+    for i in key_frames:
+        img = misc.imread(i)
+        images.append(img)
+    return images
 
 
-def train_kmeans(batch_size, code_size, clusters, H, W, code_frames):
+def train_kmeans(batch_size, code_size, clusters, H, W, vid_dict, sample_size):
+    from itertools import chain
+    from random import shuffle
+
     rng = np.random.RandomState(0)
     it = 0
+
+    video_filenames = list(chain(*vid_dict.values()))
+    shuffle(video_filenames)
+
+    code_frames = video_filenames[:sample_size]
+
     kmeans = MiniBatchKMeans(n_clusters=clusters, random_state=rng, init='k-means++', verbose=True)
     batch_data = []
 
@@ -67,7 +99,8 @@ def train_kmeans(batch_size, code_size, clusters, H, W, code_frames):
 
 
 # kmeans 처리된 데이터 떨구기
-def kemans_set_source_video(query_videos, kmeans, dataset, clusters, total_videos):
+def kemans_set_source_video(query_videos, kmeans, clusters, total_videos, video_dict):
+    dataset = video_dict.keys()
     it = 0
     video_hist = [[0 for i in range(clusters)] for i in range(total_videos)]
 
@@ -75,7 +108,7 @@ def kemans_set_source_video(query_videos, kmeans, dataset, clusters, total_video
         if d in query_videos:  # DO NOT add query videos
             continue
 
-        images = get_video_frames(d)
+        images = get_video_frames(d, video_dict)
         it += 1
         if it % 100 == 0:
             log.debug("Iteration", it)
@@ -86,7 +119,6 @@ def kemans_set_source_video(query_videos, kmeans, dataset, clusters, total_video
 
         conv1, conv2, conv3, conv4, conv5 = features_alex_net(batch_data, alex_net)
 
-        # Apply max pooling
         m1 = np.amax(conv1, axis=(1, 2))
         m2 = np.amax(conv2, axis=(1, 2))
         m3 = np.amax(conv3, axis=(1, 2))
@@ -98,10 +130,12 @@ def kemans_set_source_video(query_videos, kmeans, dataset, clusters, total_video
         kmeans.verbose = True
         y = kmeans.predict(r)
         for nearest_neighbour in y:
-            video_hist[vid][nearest_neighbour] += 1
+            video_hist[d][nearest_neighbour] += 1
+
+    return video_hist
 
 
-def normalize_video(clusters, video_num):
+def normalize_video(clusters, video_num, video_hist):
     inverse_word_count = defaultdict(int)
     total_word_count = 0
     idf = [0 for i in range(clusters)]
