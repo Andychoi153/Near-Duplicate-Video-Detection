@@ -3,6 +3,7 @@ from setting import *
 
 import pickle
 
+
 class Worker:
     def __init__(self):
         file_dir = 'dataset/Keyframes'
@@ -18,7 +19,10 @@ class Worker:
 
     def kmeans_predict(self, kmeans):
         query_videos = []
-        kemans_set_source_video(query_videos, kmeans, CLUSTERS, self.total_video, self.vid_dict)
+        video_hist = kemans_set_source_video(query_videos, kmeans, CLUSTERS, self.total_video, self.vid_dict)
+        normal_hist, idf, inverted_index = normalize_video(CLUSTERS, self.total_video, video_hist)
+        result = get_similarity(query_videos, CLUSTERS, kmeans, idf, normal_hist, inverted_index)
+        return result
 
     def run(self):
 
@@ -26,11 +30,15 @@ class Worker:
 
         try:
             kmeans = pickle.load(f)
+            log.info('model fetch')
         except Exception:
             self.kmeans_learn()
+            log.info('train complete')
             kmeans = pickle.load(f)
 
-        self.kmeans_predict(kmeans)
+        result = self.kmeans_predict(kmeans)
+        log.info(result)
+
 
 
 if __name__ =='__main__':

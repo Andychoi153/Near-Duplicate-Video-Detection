@@ -59,12 +59,12 @@ def train_kmeans(batch_size, code_size, clusters, H, W, vid_dict, sample_size):
     batch_data = []
 
     for directory in code_frames:
-        img = misc.imread(directory)
 
         try:
+            img = misc.imread(directory)
             img = cv2.resize(img, (H, W), interpolation=cv2.INTER_LINEAR)
         except Exception:
-            continue
+            log.error('file name: {directory}'.format(directory=directory))
 
         batch_data.append(img)
 
@@ -165,7 +165,7 @@ def normalize_video(clusters, video_num, video_hist):
             idf[i] = 1 + math.log(total_word_count / v)
         else:
             idf[i] = 1
-    return
+    return normal_vhist, idf, inverted_index
 
 
 # Cosine Similarity(Query,Document1) = Dot product(Query, Document1) / ||Query|| * ||Document1||
@@ -175,7 +175,7 @@ def cos_similarity(query, doc):
     return num / denom
 
 
-def get_similarity(query_videos, clusters, kmeans, idf, normal_vhist, inverted_index ):
+def get_similarity(query_videos, clusters, kmeans, idf, normal_vhist, inverted_index):
     result = {}
     for q in query_videos:
 
