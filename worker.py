@@ -1,6 +1,7 @@
 from core.method import *
 from setting import *
 
+import core.extract_key_frames
 import pickle
 
 
@@ -12,7 +13,7 @@ class Worker:
         self.total_video = len(self.vid_dict.keys())
 
     def key_frame(self):
-        pass
+        core.extract_key_frames.kf_main()
 
     def kmeans_learn(self):
         train_kmeans(BATCH_SIZE, CODE_SIZE, CLUSTERS, H, W, self.vid_dict, SAMPLE_SIZE)
@@ -25,20 +26,17 @@ class Worker:
         return result
 
     def run(self):
-
-        f = open('kmeans++_clusters.pkl', 'wb')
-
         try:
-            kmeans = pickle.load(f)
-            log.info('model fetch')
-        except Exception:
+            kmeans = pickle.load(open('kmeans++_clusters.pkl', 'rb'))
+            log.debug('model fetch')
+        except Exception :
+            log.debug('no model, train start')
             self.kmeans_learn()
-            log.info('train complete')
-            kmeans = pickle.load(f)
+            log.debug('train complete')
+            kmeans = pickle.load(open('kmeans++_clusters.pkl', 'rb'))
 
         result = self.kmeans_predict(kmeans)
-        log.info(result)
-
+        log.debug(result)
 
 
 if __name__ =='__main__':
