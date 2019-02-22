@@ -3,7 +3,7 @@ import logging
 
 def get_logger():
     logger = logging.getLogger('logger')
-    log_formatter = '[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s : %(message)s'
+    log_formatter = logging.Formatter('[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s : %(message)s')
 
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(log_formatter)
