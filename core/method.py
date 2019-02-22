@@ -18,7 +18,6 @@ class FileHandler:
         file_names = os.listdir(file_path)
         vids = []
         key_frames = []
-
         for i in file_names:
             vid = i.split('_')[0]
             vids.append(vid)
@@ -28,18 +27,24 @@ class FileHandler:
 
         for file_name in file_names:
             vid = file_name.split('_')[0]
-            temp = vid_dict.get(vid)
-            temp.append(file_name)
-            vid_dict.update({vid: temp})
+            value = vid_dict.pop(vid)
+            temp = [*value, file_name]
+            vid_dict[vid] = temp
         return vid_dict
 
 
-def get_video_frames(vid, vid_dict):
+def get_video_frames(vid, vid_dict, H, W):
     images = []
-    key_frames = vid_dict.get(vid)
-    for i in key_frames:
-        img = misc.imread(i)
-        images.append(img)
+    key_frames = vid_dict.get(str(vid))
+    if key_frames:
+        for i in key_frames:
+            try:
+                img = misc.imread('dataset/Keyframes/' + i)
+                img = cv2.resize(img, (H, W), interpolation=cv2.INTER_LINEAR)
+                images.append(img.tolist())
+            except:
+                images = None
+                log.debug(i)
     return images
 
 
@@ -61,16 +66,17 @@ def train_kmeans(batch_size, code_size, clusters, H, W, vid_dict, sample_size):
     for directory in code_frames:
 
         try:
-            img = misc.imread(directory)
+            img = misc.imread('dataset/Keyframes/'+directory)
             img = cv2.resize(img, (H, W), interpolation=cv2.INTER_LINEAR)
         except Exception:
-            log.error('file name: {directory}'.format(directory=directory))
+            log.debug('file name: {directory}'.format(directory=directory))
+            continue
 
         batch_data.append(img)
 
         if len(batch_data) == batch_size:
             it += 1
-            log.debug("Iteration", it)
+            log.debug("Iteration: {it}".format(it=it))
 
             batch_data = np.asarray(batch_data)
             batch_res = []
@@ -91,7 +97,7 @@ def train_kmeans(batch_size, code_size, clusters, H, W, vid_dict, sample_size):
                 else:
                     batch_res = np.concatenate((batch_res, r), axis=0)
 
-            log.debug(type(r[0][0]), batch_res.shape, "OUT")
+            log.debug(str(type(r[0][0])) + str(batch_res.shape) + str("OUT"))
             kmeans.partial_fit(batch_res)
             batch_data, batch_res = [], []
 
@@ -99,8 +105,8 @@ def train_kmeans(batch_size, code_size, clusters, H, W, vid_dict, sample_size):
 
 
 # kmeans 처리된 데이터 떨구기
-def kemans_set_source_video(query_videos, kmeans, clusters, total_videos, video_dict):
-    dataset = video_dict.keys()
+def kemans_set_source_video(query_videos, kmeans, clusters, total_videos, video_dict, H, W):
+    dataset = list(video_dict.keys())
     it = 0
     video_hist = [[0 for i in range(clusters)] for i in range(total_videos)]
 
@@ -108,10 +114,10 @@ def kemans_set_source_video(query_videos, kmeans, clusters, total_videos, video_
         if d in query_videos:  # DO NOT add query videos
             continue
 
-        images = get_video_frames(d, video_dict)
+        images = get_video_frames(d, video_dict, H, W)
         it += 1
         if it % 100 == 0:
-            log.debug("Iteration", it)
+            log.debug("Iteration: {it}".format(it=it))
         batch_data = np.asarray(images)
 
         if len(batch_data) == 0:
@@ -130,7 +136,7 @@ def kemans_set_source_video(query_videos, kmeans, clusters, total_videos, video_
         kmeans.verbose = True
         y = kmeans.predict(r)
         for nearest_neighbour in y:
-            video_hist[d][nearest_neighbour] += 1
+            video_hist[int(d)][nearest_neighbour] += 1
 
     return video_hist
 
@@ -175,12 +181,12 @@ def cos_similarity(query, doc):
     return num / denom
 
 
-def get_similarity(query_videos, clusters, kmeans, idf, normal_vhist, inverted_index):
+def get_similarity(query_videos, video_dict, clusters, kmeans, idf, normal_vhist, inverted_index, H, W):
     result = {}
     for q in query_videos:
 
-        images = get_video_frames(q)
-        if images is None:
+        images = get_video_frames(q, video_dict, H, W)
+        if images is None or len(images) is 0:
             continue
         batch_data = np.asarray(images)
 
